@@ -2,6 +2,8 @@ node_modules/
 dist
 .DS_Store
 .env
+.env.*
+!.env.example
 out
 
 # 動画・音声ファイル
@@ -13,3 +15,29 @@ output/
 
 # モデルファイル
 src/blaze_face_short_range.tflite
+
+# Logs
+logs
+*.log
+
+# Coverage
+coverage
+*.lcov
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional caches
+.npm
+.eslintcache
+.stylelintcache
+
+# parcel / Next.js / Nuxt
+.cache
+.parcel-cache
+.next
+.nuxt
+
+# Dependency directories
+jspm_packages/
+bower_components/
