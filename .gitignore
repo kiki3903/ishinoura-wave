@@ -1,0 +1,15 @@
+node_modules/
+dist
+.DS_Store
+.env
+out
+
+# 動画・音声ファイル
+public/*.mp4
+*.wav
+
+# レンダリング出力
+output/
+
+# モデルファイル
+src/blaze_face_short_range.tflite
