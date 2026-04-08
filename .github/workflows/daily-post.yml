@@ -1,0 +1,50 @@
+name: Daily Wave Post
+
+on:
+  schedule:
+    - cron: '0 21 * * *'  # 毎朝6時 JST (UTC 21:00 前日)
+  workflow_dispatch:       # 手動実行も可能
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # gh release upload に必要
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ffmpeg and Japanese font
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Ensure "daily" release exists
+        run: |
+          gh release view daily --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+            || gh release create daily \
+                --prerelease \
+                --title "Daily Post (auto-generated)" \
+                --notes "毎日の波情報動画。GitHub Actions により自動更新されます。" \
+                --repo "$GITHUB_REPOSITORY"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run daily post
+        run: node --experimental-strip-types src/daily-post.js
+        env:
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
