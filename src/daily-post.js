@@ -1,12 +1,5 @@
 /**
  * daily-post.js — 毎日の自動投稿スクリプト
- *
- * 1. Open-Meteo API でサーフデータ取得
- * 2. GitHub Releases から波高に応じた動画をダウンロード
- * 3. Google Cloud TTS で音声生成
- * 4. ffmpeg で動画 + 音声 + 字幕を合成
- * 5. 合成動画を GitHub Releases (daily タグ) にアップロード
- * 6. Instagram Graph API で投稿
  */
 
 import { execSync } from "child_process";
@@ -20,15 +13,13 @@ const ROOT = path.resolve(__dirname, "..");
 const TMP = "/tmp/wave-post";
 fs.mkdirSync(TMP, { recursive: true });
 
-// ── 環境変数 ──────────────────────────────────────────────────
 const GOOGLE_TTS_API_KEY     = process.env.GOOGLE_TTS_API_KEY ?? "";
 const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN ?? "";
 const INSTAGRAM_ACCOUNT_ID   = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? "";
 const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishinoura-wave";
-const VIDEOS_RELEASE_TAG     = "videos";   // 事前アップロード済み動画のタグ
-const DAILY_RELEASE_TAG      = "daily";    // 合成動画の公開用タグ
+const VIDEOS_RELEASE_TAG     = "videos";
+const DAILY_RELEASE_TAG      = "daily";
 
-// ── ヘルパー ──────────────────────────────────────────────────
 function getVideoFile(h) {
   if (h < 0.4) return "grandpa_sune.mp4";
   if (h < 0.6) return "grandpa_hiza.mp4";
@@ -51,7 +42,6 @@ function getWaveLabel(h) {
   return "アタマ";
 }
 
-// ── PCM → WAV 変換 ────────────────────────────────────────────
 function pcmToWav(pcmBuffer, sampleRate = 24000, channels = 1, bitDepth = 16) {
   const dataSize = pcmBuffer.length;
   const wav = Buffer.alloc(44 + dataSize);
@@ -72,7 +62,6 @@ function pcmToWav(pcmBuffer, sampleRate = 24000, channels = 1, bitDepth = 16) {
   return wav;
 }
 
-// ── Cloud TTS ────────────────────────────────────────────────
 async function generateVoice(text) {
   const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_TTS_API_KEY}`;
   const res = await fetch(url, {
@@ -91,9 +80,7 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
-// ── Instagram Graph API ───────────────────────────────────────
-async function postToInstagram(videoUrl, caption) {
-  // Step 1: メディアコンテナ作成
+export async function postToInstagram(videoUrl, caption) {
   console.log("  Instagram: メディアコンテナ作成中...");
   const containerRes = await fetch(
     `https://graph.facebook.com/v20.0/${INSTAGRAM_ACCOUNT_ID}/media`,
@@ -113,7 +100,6 @@ async function postToInstagram(videoUrl, caption) {
   if (!container.id) throw new Error(`コンテナ作成失敗: ${JSON.stringify(container)}`);
   console.log(`  Container ID: ${container.id}`);
 
-  // Step 2: 処理完了待ち（最大5分）
   console.log("  動画処理中...");
   let status = "IN_PROGRESS";
   for (let i = 0; i < 30; i++) {
@@ -129,7 +115,6 @@ async function postToInstagram(videoUrl, caption) {
   }
   if (status !== "FINISHED") throw new Error("タイムアウト: 動画処理が完了しませんでした");
 
-  // Step 3: 投稿
   console.log("  投稿中...");
   const publishRes = await fetch(
     `https://graph.facebook.com/v20.0/${INSTAGRAM_ACCOUNT_ID}/media_publish`,
@@ -147,31 +132,28 @@ async function postToInstagram(videoUrl, caption) {
   return published.id;
 }
 
-// ── メイン ────────────────────────────────────────────────────
 console.log("=".repeat(56));
 console.log(" 磯ノ浦 Daily Wave Post");
 console.log("=".repeat(56));
 
-// 1. サーフデータ取得
 console.log("\n[1/6] サーフデータ取得中...");
 const data = await getSurfData();
 const videoFile = getVideoFile(data.waveHeight);
 const waveLabel = getWaveLabel(data.waveHeight);
-const subtitle =
-  `${data.dateText}の磯ノ浦は\n` +
-  `${data.weather} ${data.windDirection}の風\n` +
-  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}\n` +
-  `干潮${data.kocho} 満潮${data.mancho}`;
-console.log(`  波高: ${data.waveHeight}m (${waveLabel}) → ${videoFile}`);
-console.log(`  字幕: ${subtitle}`);
 
-// 2. GitHub Releases から動画ダウンロード
+const line1 = `${data.dateText}の磯ノ浦は`;
+const line2 = `${data.weather} ${data.windDirection}の風`;
+const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}`;
+const line4 = `干潮${data.kocho} 満潮${data.mancho}`;
+
+console.log(`  波高: ${data.waveHeight}m (${waveLabel}) → ${videoFile}`);
+console.log(`  字幕: ${line1} / ${line2} / ${line3} / ${line4}`);
+
 console.log(`\n[2/6] 動画ダウンロード: ${videoFile}`);
 const inputVideo = path.join(TMP, "input.mp4");
 const videoUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${VIDEOS_RELEASE_TAG}/${videoFile}`;
 execSync(`curl -fL -o "${inputVideo}" "${videoUrl}"`, { stdio: "inherit" });
 
-// 3. Cloud TTS で音声生成
 console.log("\n[3/6] Cloud TTS で音声生成中...");
 const voiceText =
   `${data.dateText}の磯ノ浦は${data.weather}！` +
@@ -182,23 +164,25 @@ const wav = await generateVoice(voiceText);
 fs.writeFileSync(voicePath, wav);
 console.log(`  保存: ${voicePath}`);
 
-// 4. ffmpeg で動画合成
 console.log("\n[4/6] ffmpeg で合成中...");
-const subtitleFile = path.join(TMP, "subtitle.txt");
-fs.writeFileSync(subtitleFile, subtitle, "utf8");
-
-// フォントパス取得（Noto Sans CJK）
 const fontPath = execSync("fc-match -f '%{file}' 'Noto Sans CJK JP:style=Bold'")
   .toString().trim();
 console.log(`  フォント: ${fontPath}`);
 
 const outputVideo = path.join(TMP, "output.mp4");
+const lineHeight = 38;
+const baseY = 780;
 const ffmpegCmd = [
   "ffmpeg -y",
   `-i "${inputVideo}"`,
   `-i "${voicePath}"`,
   `-filter_complex`,
-  `"[0:v]drawtext=fontfile='${fontPath}':textfile='${subtitleFile}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-110:borderw=3:bordercolor=black[v]"`,
+  `"[0:v]` +
+    `drawtext=fontfile='${fontPath}':text='${line1}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY}:borderw=3:bordercolor=black,` +
+    `drawtext=fontfile='${fontPath}':text='${line2}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight}:borderw=3:bordercolor=black,` +
+    `drawtext=fontfile='${fontPath}':text='${line3}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 2}:borderw=3:bordercolor=black,` +
+    `drawtext=fontfile='${fontPath}':text='${line4}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 3}:borderw=3:bordercolor=black` +
+  `[v]"`,
   `-map "[v]" -map "1:a"`,
   `-shortest -r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
   `"${outputVideo}"`,
@@ -206,20 +190,16 @@ const ffmpegCmd = [
 execSync(ffmpegCmd, { stdio: "inherit" });
 console.log(`  出力: ${outputVideo}`);
 
-// 5. GitHub Releases (daily タグ) にアップロード
 console.log(`\n[5/6] GitHub Releases にアップロード (${DAILY_RELEASE_TAG})...`);
 execSync(
   `gh release upload ${DAILY_RELEASE_TAG} "${outputVideo}" --clobber --repo "${GITHUB_REPOSITORY}"`,
   { stdio: "inherit" }
 );
-const publicVideoUrl =
-  `https://github.com/${GITHUB_REPOSITORY}/releases/download/${DAILY_RELEASE_TAG}/output.mp4`;
+const publicVideoUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${DAILY_RELEASE_TAG}/output.mp4`;
 const resolvedRes = await fetch(publicVideoUrl, { method: 'HEAD', redirect: 'follow' });
 const directVideoUrl = resolvedRes.url;
-console.log(`  公開URL: ${publicVideoUrl}`);
 console.log(`  直接URL: ${directVideoUrl}`);
 
-// 6. Instagram 投稿
 console.log("\n[6/6] Instagram に投稿中...");
 const caption =
   `${data.dateText}の磯ノ浦\n` +
