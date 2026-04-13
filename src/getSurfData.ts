@@ -33,9 +33,8 @@ function formatDateText(date: Date): string {
   return `${month}月${day}日${timeOfDay}${hour}時`;
 }
 
-// 月齢から潮周りを計算
 function getTideType(date: Date): string {
-  const known = new Date("2000-01-06T18:14:00Z"); // 既知の新月
+  const known = new Date("2000-01-06T18:14:00Z");
   const lunarCycle = 29.530588853;
   const diffDays = (date.getTime() - known.getTime()) / 86400000;
   const age = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
@@ -55,30 +54,37 @@ function getTideType(date: Date): string {
   return "大潮";
 }
 
-// 気象庁潮汐データ取得（和歌山港）
 async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
   try {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
-    const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/WK.txt`;
+    const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/TK.txt`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
     const text = await res.text();
     const lines = text.split("\n");
-    const target = `${year}${month}${day}`;
+    const yy = String(year).slice(2);
+    const target = `${yy} ${month.replace(/^0/, "")}${day}TK`;
     for (const line of lines) {
-      if (line.startsWith(target)) {
-        // フォーマット: YYYYMMDD HH:MM L HH:MM H HH:MM L HH:MM H ...
-        const parts = line.trim().split(/\s+/);
-        const times: { time: string; type: string }[] = [];
-        for (let i = 1; i + 1 < parts.length; i += 2) {
-          times.push({ time: parts[i], type: parts[i + 1] });
-        }
-        const kocho = times.find(t => t.type === "L")?.time ?? "--:--";
-        const mancho = times.find(t => t.type === "H")?.time ?? "--:--";
-        return { kocho, mancho };
+      if (!line.includes(target)) continue;
+      const idx = line.indexOf(target) + target.length;
+      const rest = line.slice(idx).trim();
+      const tokens = rest.match(/\d+/g) ?? [];
+      const times: { time: string; height: number }[] = [];
+      for (let i = 0; i + 1 < tokens.length; i += 2) {
+        const t = tokens[i];
+        const h = parseInt(tokens[i + 1]);
+        if (h >= 999) break;
+        const hh = t.slice(0, -2).padStart(2, "0");
+        const mm = t.slice(-2);
+        times.push({ time: `${hh}:${mm}`, height: h });
       }
+      if (times.length < 2) break;
+      times.sort((a, b) => a.height - b.height);
+      const kocho = times[0].time;
+      const mancho = times[times.length - 1].time;
+      return { kocho, mancho };
     }
   } catch (e) {
     console.error("潮汐データ取得エラー:", e);
