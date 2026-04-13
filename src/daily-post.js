@@ -198,7 +198,7 @@ const ffmpegCmd = [
   `-filter_complex`,
   `"[0:v]drawtext=fontfile='${fontPath}':textfile='${subtitleFile}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-110:borderw=3:bordercolor=black[v]"`,
   `-map "[v]" -map "1:a"`,
-  `-shortest -r 30 -c:v libx264 -c:a aac`,
+  `-shortest -r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
   `"${outputVideo}"`,
 ].join(" ");
 execSync(ffmpegCmd, { stdio: "inherit" });
