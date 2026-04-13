@@ -145,6 +145,7 @@ const line1 = `${data.dateText}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
 const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}`;
 const line4 = `干潮${data.kocho} 満潮${data.mancho}`;
+const line4Escaped = line4.replace(/:/g, "\\:");
 
 console.log(`  波高: ${data.waveHeight}m (${waveLabel}) → ${videoFile}`);
 console.log(`  字幕: ${line1} / ${line2} / ${line3} / ${line4}`);
