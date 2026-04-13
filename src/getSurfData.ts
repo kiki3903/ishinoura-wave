@@ -57,17 +57,19 @@ function getTideType(date: Date): string {
 async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
   try {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1);
+    const dd = String(date.getDate()).padStart(2, "0");
     const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/TK.txt`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
     const text = await res.text();
     const lines = text.split("\n");
     const yy = String(year).slice(2);
-    const target = `${yy} ${month.replace(/^0/, "")}${day}TK`;
+    const target = `${yy} ${mm}${dd}TK`;
+    console.log(`  潮汐検索キー: "${target}"`);
     for (const line of lines) {
       if (!line.includes(target)) continue;
+      console.log(`  マッチ行: ${line.slice(0, 60)}`);
       const idx = line.indexOf(target) + target.length;
       const rest = line.slice(idx).trim();
       const tokens = rest.match(/\d+/g) ?? [];
@@ -77,15 +79,17 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
         const h = parseInt(tokens[i + 1]);
         if (h >= 999) break;
         const hh = t.slice(0, -2).padStart(2, "0");
-        const mm = t.slice(-2);
-        times.push({ time: `${hh}:${mm}`, height: h });
+        const mn = t.slice(-2);
+        times.push({ time: `${hh}:${mn}`, height: h });
       }
+      console.log(`  潮汐times: ${JSON.stringify(times)}`);
       if (times.length < 2) break;
       times.sort((a, b) => a.height - b.height);
       const kocho = times[0].time;
       const mancho = times[times.length - 1].time;
       return { kocho, mancho };
     }
+    console.log("  潮汐データ: マッチなし");
   } catch (e) {
     console.error("潮汐データ取得エラー:", e);
   }
