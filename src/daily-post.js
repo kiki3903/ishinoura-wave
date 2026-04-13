@@ -157,7 +157,7 @@ execSync(`curl -fL -o "${inputVideo}" "${videoUrl}"`, { stdio: "inherit" });
 console.log("\n[3/6] Cloud TTS で音声生成中...");
 const voiceText =
   `${data.dateText}の磯ノ浦は${data.weather}！` +
-  `${data.windDirection}の風${data.windSpeed}メートル！` +
+  `${data.windDirection}の風！` +
   `波は${waveLabel}！${data.tideType}で干潮${data.kocho}、満潮${data.mancho}です！`;
 const voicePath = path.join(TMP, "voice.wav");
 const wav = await generateVoice(voiceText);
@@ -184,7 +184,7 @@ const ffmpegCmd = [
     `drawtext=fontfile='${fontPath}':text='${line4}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 3}:borderw=3:bordercolor=black` +
   `[v]"`,
   `-map "[v]" -map "1:a"`,
-  `-shortest -r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
+  `-r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
   `"${outputVideo}"`,
 ].join(" ");
 execSync(ffmpegCmd, { stdio: "inherit" });
