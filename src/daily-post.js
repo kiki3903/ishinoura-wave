@@ -171,7 +171,7 @@ console.log(`  フォント: ${fontPath}`);
 
 const outputVideo = path.join(TMP, "output.mp4");
 const lineHeight = 38;
-const baseY = 720;
+const baseY = 660;
 const ffmpegCmd = [
   "ffmpeg -y",
   `-i "${inputVideo}"`,
