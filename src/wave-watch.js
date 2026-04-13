@@ -105,8 +105,8 @@ const waveLabel = getWaveLabel(currentHeight);
 
 const line1 = `${data.dateText}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
-const line3 = `波は${waveLabel}(${currentHeight.toFixed(2)}m)${data.tideType}`;
-const line4 = `干潮${data.kocho} 満潮${data.mancho}`;
+const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)`;
+const line4 = `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}`;
 const line4Escaped = line4.replace(/:/g, "\\:");
 
 const inputVideo = path.join(TMP, "input.mp4");
