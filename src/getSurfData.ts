@@ -24,15 +24,66 @@ function formatDateText(date: Date): string {
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const hour = date.getHours();
-
   let timeOfDay: string;
   if (hour < 5) timeOfDay = "深夜";
   else if (hour <= 10) timeOfDay = "朝";
   else if (hour <= 15) timeOfDay = "昼";
   else if (hour <= 18) timeOfDay = "夕方";
   else timeOfDay = "夜";
+  return `${month}月${day}日${timeOfDay}${hour}時`;
+}
 
-  return `${month}月${day}日 ${timeOfDay}${hour}時`;
+// 月齢から潮周りを計算
+function getTideType(date: Date): string {
+  const known = new Date("2000-01-06T18:14:00Z"); // 既知の新月
+  const lunarCycle = 29.530588853;
+  const diffDays = (date.getTime() - known.getTime()) / 86400000;
+  const age = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
+  if (age <= 1.5 || age >= 28) return "大潮";
+  if (age <= 4) return "中潮";
+  if (age <= 6) return "小潮";
+  if (age <= 7) return "長潮";
+  if (age <= 8) return "若潮";
+  if (age <= 11) return "中潮";
+  if (age <= 13) return "大潮";
+  if (age <= 15.5) return "大潮";
+  if (age <= 18) return "中潮";
+  if (age <= 20) return "小潮";
+  if (age <= 21) return "長潮";
+  if (age <= 22) return "若潮";
+  if (age <= 25) return "中潮";
+  return "大潮";
+}
+
+// 気象庁潮汐データ取得（和歌山港）
+async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
+  try {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/WK.txt`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("JMA fetch failed");
+    const text = await res.text();
+    const lines = text.split("\n");
+    const target = `${year}${month}${day}`;
+    for (const line of lines) {
+      if (line.startsWith(target)) {
+        // フォーマット: YYYYMMDD HH:MM L HH:MM H HH:MM L HH:MM H ...
+        const parts = line.trim().split(/\s+/);
+        const times: { time: string; type: string }[] = [];
+        for (let i = 1; i + 1 < parts.length; i += 2) {
+          times.push({ time: parts[i], type: parts[i + 1] });
+        }
+        const kocho = times.find(t => t.type === "L")?.time ?? "--:--";
+        const mancho = times.find(t => t.type === "H")?.time ?? "--:--";
+        return { kocho, mancho };
+      }
+    }
+  } catch (e) {
+    console.error("潮汐データ取得エラー:", e);
+  }
+  return { kocho: "--:--", mancho: "--:--" };
 }
 
 export type SurfData = {
@@ -41,6 +92,9 @@ export type SurfData = {
   windDirection: string;
   dateText: string;
   weather: string;
+  tideType: string;
+  kocho: string;
+  mancho: string;
 };
 
 export async function getSurfData(): Promise<SurfData> {
@@ -48,7 +102,7 @@ export async function getSurfData(): Promise<SurfData> {
   const now = new Date();
   const idx = Math.min(now.getHours(), 23);
 
-  const [marineRes, weatherRes] = await Promise.all([
+  const [marineRes, weatherRes, tideData] = await Promise.all([
     fetch(
       `https://marine-api.open-meteo.com/v1/marine` +
         `?latitude=${LAT}&longitude=${LON}` +
@@ -64,6 +118,7 @@ export async function getSurfData(): Promise<SurfData> {
         `&start_date=${today}&end_date=${today}` +
         `&timezone=Asia%2FTokyo`
     ),
+    getTideData(now),
   ]);
 
   if (!marineRes.ok) throw new Error(`Marine API error: HTTP ${marineRes.status}`);
@@ -83,5 +138,8 @@ export async function getSurfData(): Promise<SurfData> {
     windDirection: degreesToJapanese(windDeg),
     dateText: formatDateText(now),
     weather: weatherCodeToJapanese(weatherCode),
+    tideType: getTideType(now),
+    kocho: tideData.kocho,
+    mancho: tideData.mancho,
   };
 }
