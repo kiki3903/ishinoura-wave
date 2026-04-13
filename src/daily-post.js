@@ -158,8 +158,10 @@ const data = await getSurfData();
 const videoFile = getVideoFile(data.waveHeight);
 const waveLabel = getWaveLabel(data.waveHeight);
 const subtitle =
-  `${data.dateText}の磯ノ浦は${data.weather} 風速${data.windSpeed}m${data.windDirection}風　` +
-  `波は${waveLabel}（${data.waveHeight.toFixed(2)}m）皆さんご安全に！`;
+  `${data.dateText}の磯ノ浦は\n` +
+  `${data.weather} ${data.windDirection}の風\n` +
+  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}\n` +
+  `干潮${data.kocho} 満潮${data.mancho}`;
 console.log(`  波高: ${data.waveHeight}m (${waveLabel}) → ${videoFile}`);
 console.log(`  字幕: ${subtitle}`);
 
@@ -174,7 +176,7 @@ console.log("\n[3/6] Cloud TTS で音声生成中...");
 const voiceText =
   `${data.dateText}の磯ノ浦は${data.weather}！` +
   `${data.windDirection}の風${data.windSpeed}メートル！` +
-  `波は${waveLabel}！皆さんご安全に！`;
+  `波は${waveLabel}！${data.tideType}で干潮${data.kocho}、満潮${data.mancho}です！`;
 const voicePath = path.join(TMP, "voice.wav");
 const wav = await generateVoice(voiceText);
 fs.writeFileSync(voicePath, wav);
@@ -221,8 +223,9 @@ console.log(`  直接URL: ${directVideoUrl}`);
 console.log("\n[6/6] Instagram に投稿中...");
 const caption =
   `${data.dateText}の磯ノ浦\n` +
-  `${data.weather}  ${data.windDirection}の風${data.windSpeed}m\n` +
-  `波は${waveLabel}（${data.waveHeight.toFixed(2)}m）\n` +
+  `${data.weather} ${data.windDirection}の風\n` +
+  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}\n` +
+  `干潮${data.kocho} 満潮${data.mancho}\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
