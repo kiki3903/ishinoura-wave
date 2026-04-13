@@ -63,33 +63,129 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
     const text = await res.text();
-    const lines = text.split("\n");
     const yy = String(year).slice(2);
     const target = `${yy} ${mm}${dd}TK`;
-    console.log(`  潮汐検索キー: "${target}"`);
-    for (const line of lines) {
+
+    for (const line of text.split("\n")) {
       if (!line.includes(target)) continue;
-      console.log(`  マッチ行: ${line.slice(0, 60)}`);
       const idx = line.indexOf(target) + target.length;
-      const rest = line.slice(idx).trim();
-      const tokens = rest.match(/\d+/g) ?? [];
-      const times: { time: string; height: number }[] = [];
-      for (let i = 0; i + 1 < tokens.length; i += 2) {
-        const t = tokens[i];
-        const h = parseInt(tokens[i + 1]);
-        if (h >= 999) break;
-        const hh = t.slice(0, -2).padStart(2, "0");
-        const mn = t.slice(-2);
-        times.push({ time: `${hh}:${mn}`, height: h });
+      const rest = line.slice(idx);
+      const allTides: { time: string; height: number }[] = [];
+
+      for (const block of rest.split(/9{5,}/).map(b => b.trim()).filter(Boolean)) {
+        const parts = block.split(/\s+/).filter(p => p && !/^9+$/.test(p));
+        let i = 0;
+
+        while (i < parts.length) {
+          const part = parts[i];
+          const val = parseInt(part);
+
+          // 1-2桁の時 (standalone hour): 次トークンに分・高さ・次の時が詰まっている
+          if (part.length <= 2 && val >= 0 && val <= 23 && i + 1 < parts.length) {
+            const next = parts[i + 1];
+            if (next.length >= 4) {
+              const mTens = parseInt(next[0]);
+              const height = parseInt(next.slice(1, 4));
+              if (mTens >= 0 && mTens <= 5 && height >= 0 && height <= 350) {
+                allTides.push({
+                  time: `${String(val).padStart(2, "0")}:${String(mTens * 10).padStart(2, "0")}`,
+                  height,
+                });
+                i += 2;
+                if (next.length > 4) {
+                  const embHour = parseInt(next.slice(4));
+                  if (embHour >= 0 && embHour <= 23 && i < parts.length) {
+                    const next2 = parts[i];
+                    if (next2.length >= 4) {
+                      const m2 = parseInt(next2[0]);
+                      const h2 = parseInt(next2.slice(1, 4));
+                      if (m2 >= 0 && m2 <= 5 && h2 >= 0 && h2 <= 350) {
+                        allTides.push({
+                          time: `${String(embHour).padStart(2, "0")}:${String(m2 * 10).padStart(2, "0")}`,
+                          height: h2,
+                        });
+                        i++;
+                      }
+                    }
+                  }
+                }
+                continue;
+              }
+            }
+          }
+
+          // 3桁 HMM (1桁時 + 2桁分)
+          if (part.length === 3) {
+            const h = parseInt(part[0]);
+            const m = parseInt(part.slice(1));
+            if (h >= 1 && h <= 9 && m >= 0 && m <= 59 && i + 1 < parts.length) {
+              const height = parseInt(parts[i + 1]);
+              if (height >= 0 && height <= 350) {
+                allTides.push({ time: `0${part[0]}:${part.slice(1)}`, height });
+                i += 2; continue;
+              }
+            }
+          }
+
+          // 4桁 HHMM (2桁時 + 2桁分)
+          if (part.length === 4) {
+            const h = parseInt(part.slice(0, 2));
+            const m = parseInt(part.slice(2));
+            if (h >= 0 && h <= 23 && m >= 0 && m <= 59 && i + 1 < parts.length) {
+              const height = parseInt(parts[i + 1]);
+              if (height >= 0 && height <= 350) {
+                allTides.push({ time: `${part.slice(0, 2)}:${part.slice(2)}`, height });
+                i += 2; continue;
+              }
+            }
+          }
+
+          // 長い連結トークンをストリームとして解析
+          if (part.length > 4) {
+            let pos = 0;
+            while (pos < part.length - 2) {
+              let timeStr = "", skipLen = 0;
+              if (pos + 4 <= part.length) {
+                const h = parseInt(part.slice(pos, pos + 2));
+                const m = parseInt(part.slice(pos + 2, pos + 4));
+                if (h >= 10 && h <= 23 && m >= 0 && m <= 59) {
+                  timeStr = `${part.slice(pos, pos + 2)}:${part.slice(pos + 2, pos + 4)}`;
+                  skipLen = 4;
+                }
+              }
+              if (!timeStr && pos + 3 <= part.length) {
+                const h = parseInt(part[pos]);
+                const m = parseInt(part.slice(pos + 1, pos + 3));
+                if (h >= 1 && h <= 9 && m >= 0 && m <= 59) {
+                  timeStr = `0${part[pos]}:${part.slice(pos + 1, pos + 3)}`;
+                  skipLen = 3;
+                }
+              }
+              if (!timeStr) { pos++; continue; }
+              pos += skipLen;
+              let pushed = false;
+              for (const hlen of [3, 2]) {
+                if (pos + hlen <= part.length) {
+                  const h = parseInt(part.slice(pos, pos + hlen));
+                  if (h >= 0 && h <= 350) {
+                    allTides.push({ time: timeStr, height: h });
+                    pos += hlen; pushed = true; break;
+                  }
+                }
+              }
+              if (!pushed) pos++;
+            }
+          }
+
+          i++;
+        }
       }
-      console.log(`  潮汐times: ${JSON.stringify(times)}`);
-      if (times.length < 2) break;
-      times.sort((a, b) => a.height - b.height);
-      const kocho = times[0].time;
-      const mancho = times[times.length - 1].time;
-      return { kocho, mancho };
+
+      if (allTides.length < 2) break;
+      console.log(`  潮汐データ: ${JSON.stringify(allTides)}`);
+      allTides.sort((a, b) => a.height - b.height);
+      return { kocho: allTides[0].time, mancho: allTides[allTides.length - 1].time };
     }
-    console.log("  潮汐データ: マッチなし");
   } catch (e) {
     console.error("潮汐データ取得エラー:", e);
   }
