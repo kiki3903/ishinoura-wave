@@ -107,6 +107,7 @@ const line1 = `${data.dateText}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
 const line3 = `波は${waveLabel}(${currentHeight.toFixed(2)}m)${data.tideType}`;
 const line4 = `干潮${data.kocho} 満潮${data.mancho}`;
+const line4Escaped = line4.replace(/:/g, "\\:");
 
 const inputVideo = path.join(TMP, "input.mp4");
 const voicePath  = path.join(TMP, "voice.wav");
@@ -117,14 +118,14 @@ execSync(`curl -fL -o "${inputVideo}" "${videoUrl}"`, { stdio: "inherit" });
 
 const voiceText =
   `${data.dateText}の磯ノ浦は${data.weather}！` +
-  `${data.windDirection}の風${data.windSpeed}メートル！` +
-  `波は${waveLabel}！${data.tideType}で干潮${data.kocho}、満潮${data.mancho}です！`;
+  `${data.windDirection}の風！` +
+  `波は${waveLabel}！皆さんご安全に！`;
 const wav = await generateVoice(voiceText);
 fs.writeFileSync(voicePath, wav);
 
 const fontPath = execSync("fc-match -f '%{file}' 'Noto Sans CJK JP:style=Bold'").toString().trim();
 const lineHeight = 38;
-const baseY = 780;
+const baseY = 660;
 const ffmpegCmd = [
   "ffmpeg -y",
   `-i "${inputVideo}"`,
@@ -134,10 +135,10 @@ const ffmpegCmd = [
     `drawtext=fontfile='${fontPath}':text='${line1}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY}:borderw=3:bordercolor=black,` +
     `drawtext=fontfile='${fontPath}':text='${line2}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight}:borderw=3:bordercolor=black,` +
     `drawtext=fontfile='${fontPath}':text='${line3}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 2}:borderw=3:bordercolor=black,` +
-    `drawtext=fontfile='${fontPath}':text='${line4}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 3}:borderw=3:bordercolor=black` +
+    `drawtext=fontfile='${fontPath}':text='${line4Escaped}':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=${baseY + lineHeight * 3}:borderw=3:bordercolor=black` +
   `[v]"`,
   `-map "[v]" -map "1:a"`,
-  `-shortest -r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
+  `-r 30 -c:v libx264 -profile:v main -level 3.1 -c:a aac`,
   `"${outputVideo}"`,
 ].join(" ");
 execSync(ffmpegCmd, { stdio: "inherit" });
