@@ -212,7 +212,10 @@ execSync(
 );
 const publicVideoUrl =
   `https://github.com/${GITHUB_REPOSITORY}/releases/download/${DAILY_RELEASE_TAG}/output.mp4`;
+const resolvedRes = await fetch(publicVideoUrl, { method: 'HEAD', redirect: 'follow' });
+const directVideoUrl = resolvedRes.url;
 console.log(`  公開URL: ${publicVideoUrl}`);
+console.log(`  直接URL: ${directVideoUrl}`);
 
 // 6. Instagram 投稿
 console.log("\n[6/6] Instagram に投稿中...");
@@ -221,5 +224,5 @@ const caption =
   `${data.weather}  ${data.windDirection}の風${data.windSpeed}m\n` +
   `波は${waveLabel}（${data.waveHeight.toFixed(2)}m）\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
-const postId = await postToInstagram(publicVideoUrl, caption);
+const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
