@@ -205,8 +205,8 @@ console.log("\n[6/6] Instagram に投稿中...");
 const caption =
   `${data.dateText}の磯ノ浦\n` +
   `${data.weather} ${data.windDirection}の風\n` +
-  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)${data.tideType}\n` +
-  `干潮${data.kocho} 満潮${data.mancho}\n` +
+  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
+  `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
