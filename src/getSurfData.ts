@@ -68,12 +68,29 @@ function getTideType(date: Date): string {
   return "大潮";
 }
 
+function timeStrToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function findNearest(tides: { time: string; height: number }[], currentMinutes: number, type: "low" | "high"): string {
+  const sorted = tides
+    .filter(t => type === "low" ? t.height <= 100 : t.height >= 120)
+    .sort((a, b) => {
+      const da = Math.abs(timeStrToMinutes(a.time) - currentMinutes);
+      const db = Math.abs(timeStrToMinutes(b.time) - currentMinutes);
+      return da - db;
+    });
+  return sorted[0]?.time ?? "--:--";
+}
+
 async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
   try {
     const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
     const year = jst.getUTCFullYear();
     const mm = String(jst.getUTCMonth() + 1);
     const dd = String(jst.getUTCDate()).padStart(2, "0");
+    const currentMinutes = jst.getUTCHours() * 60 + jst.getUTCMinutes();
     const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/TK.txt`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
@@ -187,8 +204,10 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
       }
 
       if (allTides.length < 2) break;
-      allTides.sort((a, b) => a.height - b.height);
-      return { kocho: allTides[0].time, mancho: allTides[allTides.length - 1].time };
+      console.log(`  潮汐データ: ${JSON.stringify(allTides)}`);
+      const kocho = findNearest(allTides, currentMinutes, "low");
+      const mancho = findNearest(allTides, currentMinutes, "high");
+      return { kocho, mancho };
     }
   } catch (e) {
     console.error("潮汐データ取得エラー:", e);
