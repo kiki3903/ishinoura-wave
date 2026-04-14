@@ -20,10 +20,10 @@ function weatherCodeToJapanese(code: number): string {
   return "雷雨";
 }
 
-function formatDateText(date: Date): string {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hour = date.getHours();
+function formatDateText(jst: Date): string {
+  const month = jst.getUTCMonth() + 1;
+  const day = jst.getUTCDate();
+  const hour = jst.getUTCHours();
   let timeOfDay: string;
   if (hour < 5) timeOfDay = "深夜";
   else if (hour <= 10) timeOfDay = "朝";
@@ -33,32 +33,47 @@ function formatDateText(date: Date): string {
   return `${month}月${day}日${timeOfDay}${hour}時`;
 }
 
+function formatDateTextDetail(jst: Date): string {
+  const month = jst.getUTCMonth() + 1;
+  const day = jst.getUTCDate();
+  const hour = jst.getUTCHours();
+  const min = String(jst.getUTCMinutes()).padStart(2, "0");
+  let timeOfDay: string;
+  if (hour < 5) timeOfDay = "深夜";
+  else if (hour <= 10) timeOfDay = "朝";
+  else if (hour <= 15) timeOfDay = "昼";
+  else if (hour <= 18) timeOfDay = "夕方";
+  else timeOfDay = "夜";
+  return `${month}月${day}日${timeOfDay}${hour}時${min}分`;
+}
+
 function getTideType(date: Date): string {
   const known = new Date("2000-01-06T18:14:00Z");
   const lunarCycle = 29.530588853;
   const diffDays = (date.getTime() - known.getTime()) / 86400000;
   const age = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
-  if (age <= 1.5 || age >= 28) return "大潮";
+  if (age <= 2) return "大潮";
   if (age <= 4) return "中潮";
   if (age <= 6) return "小潮";
   if (age <= 7) return "長潮";
   if (age <= 8) return "若潮";
   if (age <= 11) return "中潮";
-  if (age <= 13) return "大潮";
-  if (age <= 15.5) return "大潮";
-  if (age <= 18) return "中潮";
-  if (age <= 20) return "小潮";
-  if (age <= 21) return "長潮";
-  if (age <= 22) return "若潮";
+  if (age <= 15) return "大潮";
+  if (age <= 17) return "中潮";
+  if (age <= 19) return "小潮";
+  if (age <= 20) return "長潮";
+  if (age <= 21) return "若潮";
   if (age <= 25) return "中潮";
+  if (age <= 29.5) return "大潮";
   return "大潮";
 }
 
 async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
   try {
-    const year = date.getFullYear();
-    const mm = String(date.getMonth() + 1);
-    const dd = String(date.getDate()).padStart(2, "0");
+    const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    const year = jst.getUTCFullYear();
+    const mm = String(jst.getUTCMonth() + 1);
+    const dd = String(jst.getUTCDate()).padStart(2, "0");
     const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/TK.txt`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
@@ -75,12 +90,9 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
       for (const block of rest.split(/9{5,}/).map(b => b.trim()).filter(Boolean)) {
         const parts = block.split(/\s+/).filter(p => p && !/^9+$/.test(p));
         let i = 0;
-
         while (i < parts.length) {
           const part = parts[i];
           const val = parseInt(part);
-
-          // 1-2桁の時 (standalone hour): 次トークンに分・高さ・次の時が詰まっている
           if (part.length <= 2 && val >= 0 && val <= 23 && i + 1 < parts.length) {
             const next = parts[i + 1];
             if (next.length >= 4) {
@@ -113,8 +125,6 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
               }
             }
           }
-
-          // 3桁 HMM (1桁時 + 2桁分)
           if (part.length === 3) {
             const h = parseInt(part[0]);
             const m = parseInt(part.slice(1));
@@ -126,8 +136,6 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
               }
             }
           }
-
-          // 4桁 HHMM (2桁時 + 2桁分)
           if (part.length === 4) {
             const h = parseInt(part.slice(0, 2));
             const m = parseInt(part.slice(2));
@@ -139,8 +147,6 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
               }
             }
           }
-
-          // 長い連結トークンをストリームとして解析
           if (part.length > 4) {
             let pos = 0;
             while (pos < part.length - 2) {
@@ -176,13 +182,11 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string 
               if (!pushed) pos++;
             }
           }
-
           i++;
         }
       }
 
       if (allTides.length < 2) break;
-      console.log(`  潮汐データ: ${JSON.stringify(allTides)}`);
       allTides.sort((a, b) => a.height - b.height);
       return { kocho: allTides[0].time, mancho: allTides[allTides.length - 1].time };
     }
@@ -197,6 +201,7 @@ export type SurfData = {
   windSpeed: number;
   windDirection: string;
   dateText: string;
+  dateTextDetail: string;
   weather: string;
   tideType: string;
   kocho: string;
@@ -204,9 +209,10 @@ export type SurfData = {
 };
 
 export async function getSurfData(): Promise<SurfData> {
-  const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
-  const idx = Math.min(now.getHours(), 23);
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const today = jst.toISOString().slice(0, 10);
+  const idx = Math.min(jst.getUTCHours(), 23);
 
   const [marineRes, weatherRes, tideData] = await Promise.all([
     fetch(
@@ -242,7 +248,8 @@ export async function getSurfData(): Promise<SurfData> {
     waveHeight,
     windSpeed: Math.round(windSpeedRaw * 10) / 10,
     windDirection: degreesToJapanese(windDeg),
-    dateText: formatDateText(now),
+    dateText: formatDateText(jst),
+    dateTextDetail: formatDateTextDetail(jst),
     weather: weatherCodeToJapanese(weatherCode),
     tideType: getTideType(now),
     kocho: tideData.kocho,
