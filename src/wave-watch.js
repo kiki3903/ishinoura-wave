@@ -101,7 +101,7 @@ if (lastWaveHeight !== null) {
 const videoFile = getVideoFile(currentHeight);
 const waveLabel = getWaveLabel(currentHeight);
 
-const line1 = `${data.dateText}の磯ノ浦は`;
+const line1 = `${data.dateTextDetail}の磯ノ浦は`
 const line2 = `${data.weather} ${data.windDirection}の風`;
 const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)`;
 const line4 = data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}` : `満潮${data.mancho} 干潮${data.kocho} ${data.tideType}`;
