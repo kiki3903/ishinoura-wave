@@ -26,4 +26,29 @@ export async function postToInstagram(videoUrl, caption) {
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 10000));
     const statusRes = await fetch(
-      `https://graph.facebook.com/v20.0/${container.id}?fields=status_co
+      `https://graph.facebook.com/v20.0/${container.id}?fields=status_code&access_token=${INSTAGRAM_ACCESS_TOKEN}`
+    );
+    const s = await statusRes.json();
+    status = s.status_code;
+    console.log(`  Status: ${status} (${i + 1}/30)`);
+    if (status === "FINISHED") break;
+    if (status === "ERROR") throw new Error(`動画処理エラー: ${JSON.stringify(s)}`);
+  }
+  if (status !== "FINISHED") throw new Error("タイムアウト: 動画処理が完了しませんでした");
+
+  console.log("  投稿中...");
+  const publishRes = await fetch(
+    `https://graph.facebook.com/v20.0/${INSTAGRAM_ACCOUNT_ID}/media_publish`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        creation_id: container.id,
+        access_token: INSTAGRAM_ACCESS_TOKEN,
+      }),
+    }
+  );
+  const published = await publishRes.json();
+  if (!published.id) throw new Error(`投稿失敗: ${JSON.stringify(published)}`);
+  return published.id;
+}
