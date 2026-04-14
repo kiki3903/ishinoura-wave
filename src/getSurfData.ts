@@ -64,155 +64,115 @@ function getTideType(date: Date): string {
   if (age <= 20.5) return "長潮";
   if (age <= 22) return "若潮";
   if (age <= 27) return "中潮";
-  if (age <= 29.5) return "大潮";
   return "大潮";
 }
 
-function timeStrToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+function parseTideSection(s: string): { time: string; height: number }[] {
+  const tides: { time: string; height: number }[] = [];
+  let i = 0;
+  while (i < s.length) {
+    while (i < s.length && s[i] === " ") i++;
+    if (i >= s.length) break;
+    if (!/\d/.test(s[i])) { i++; continue; }
+    const twoDigit = parseInt(s.slice(i, i + 2));
+    const timeLen = (twoDigit >= 10 && twoDigit <= 23) ? 4 : 3;
+    if (i + timeLen + 3 > s.length) break;
+    const timeStr = s.slice(i, i + timeLen);
+    const h = parseInt(timeStr.slice(0, -2));
+    const min = parseInt(timeStr.slice(-2));
+    const heightStr = s.slice(i + timeLen, i + timeLen + 3).trim();
+    const height = parseInt(heightStr);
+    if (h >= 0 && h <= 23 && min >= 0 && min <= 59 && !isNaN(height) && height > 0 && height <= 350) {
+      tides.push({
+        time: `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`,
+        height,
+      });
+    }
+    i += timeLen + 3;
+  }
+  return tides;
 }
 
-function findNearest(tides: { time: string; height: number }[], currentMinutes: number, type: "low" | "high"): string {
-  const sorted = tides
-    .filter(t => type === "low" ? t.height <= 100 : t.height >= 120)
-    .sort((a, b) => {
-      const da = Math.abs(timeStrToMinutes(a.time) - currentMinutes);
-      const db = Math.abs(timeStrToMinutes(b.time) - currentMinutes);
-      return da - db;
-    });
-  return sorted[0]?.time ?? "--:--";
+function parseDayTides(text: string, yy: string, mm: string, dd: string): {
+  high: { time: string; height: number }[];
+  low: { time: string; height: number }[];
+} {
+  const target = `${yy} ${mm}${dd}WY`;
+  for (const line of text.split("\n")) {
+    if (!line.includes(target)) continue;
+    const idx = line.indexOf(target) + target.length;
+    const rest = line.slice(idx);
+    const sections = rest.split(/9{5,}/);
+    return {
+      high: parseTideSection(sections[0] ?? ""),
+      low:  parseTideSection(sections[1] ?? ""),
+    };
+  }
+  return { high: [], low: [] };
 }
 
-async function getTideData(date: Date): Promise<{ kocho: string; mancho: string }> {
+async function getTideData(date: Date): Promise<{ kocho: string; mancho: string; kochoFirst: boolean }> {
   try {
     const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-    const year = jst.getUTCFullYear();
-    const mm = String(jst.getUTCMonth() + 1);
-    const dd = String(jst.getUTCDate()).padStart(2, "0");
     const currentMinutes = jst.getUTCHours() * 60 + jst.getUTCMinutes();
-    const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/TK.txt`;
+    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+    const year = jst.getUTCFullYear();
+    const mm   = String(jst.getUTCMonth() + 1);
+    const dd   = String(jst.getUTCDate()).padStart(2, "0");
+    const yy   = String(year).slice(2);
+
+    const tomorrow = new Date(jst.getTime() + 24 * 60 * 60 * 1000);
+    const tmm = String(tomorrow.getUTCMonth() + 1);
+    const tdd = String(tomorrow.getUTCDate()).padStart(2, "0");
+    const tyy = String(tomorrow.getUTCFullYear()).slice(2);
+
+    const url = `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/${year}/WY.txt`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("JMA fetch failed");
     const text = await res.text();
-    const yy = String(year).slice(2);
-    const target = `${yy} ${mm}${dd}TK`;
 
-    for (const line of text.split("\n")) {
-      if (!line.includes(target)) continue;
-      const idx = line.indexOf(target) + target.length;
-      const rest = line.slice(idx);
-      const allTides: { time: string; height: number }[] = [];
+    const today   = parseDayTides(text, yy,  mm,  dd);
+    const nextDay = parseDayTides(text, tyy, tmm, tdd);
 
-      for (const block of rest.split(/9{5,}/).map(b => b.trim()).filter(Boolean)) {
-        const parts = block.split(/\s+/).filter(p => p && !/^9+$/.test(p));
-        let i = 0;
-        while (i < parts.length) {
-          const part = parts[i];
-          const val = parseInt(part);
-          if (part.length <= 2 && val >= 0 && val <= 23 && i + 1 < parts.length) {
-            const next = parts[i + 1];
-            if (next.length >= 4) {
-              const mTens = parseInt(next[0]);
-              const height = parseInt(next.slice(1, 4));
-              if (mTens >= 0 && mTens <= 5 && height >= 0 && height <= 350) {
-                allTides.push({
-                  time: `${String(val).padStart(2, "0")}:${String(mTens * 10).padStart(2, "0")}`,
-                  height,
-                });
-                i += 2;
-                if (next.length > 4) {
-                  const embHour = parseInt(next.slice(4));
-                  if (embHour >= 0 && embHour <= 23 && i < parts.length) {
-                    const next2 = parts[i];
-                    if (next2.length >= 4) {
-                      const m2 = parseInt(next2[0]);
-                      const h2 = parseInt(next2.slice(1, 4));
-                      if (m2 >= 0 && m2 <= 5 && h2 >= 0 && h2 <= 350) {
-                        allTides.push({
-                          time: `${String(embHour).padStart(2, "0")}:${String(m2 * 10).padStart(2, "0")}`,
-                          height: h2,
-                        });
-                        i++;
-                      }
-                    }
-                  }
-                }
-                continue;
-              }
-            }
-          }
-          if (part.length === 3) {
-            const h = parseInt(part[0]);
-            const m = parseInt(part.slice(1));
-            if (h >= 1 && h <= 9 && m >= 0 && m <= 59 && i + 1 < parts.length) {
-              const height = parseInt(parts[i + 1]);
-              if (height >= 0 && height <= 350) {
-                allTides.push({ time: `0${part[0]}:${part.slice(1)}`, height });
-                i += 2; continue;
-              }
-            }
-          }
-          if (part.length === 4) {
-            const h = parseInt(part.slice(0, 2));
-            const m = parseInt(part.slice(2));
-            if (h >= 0 && h <= 23 && m >= 0 && m <= 59 && i + 1 < parts.length) {
-              const height = parseInt(parts[i + 1]);
-              if (height >= 0 && height <= 350) {
-                allTides.push({ time: `${part.slice(0, 2)}:${part.slice(2)}`, height });
-                i += 2; continue;
-              }
-            }
-          }
-          if (part.length > 4) {
-            let pos = 0;
-            while (pos < part.length - 2) {
-              let timeStr = "", skipLen = 0;
-              if (pos + 4 <= part.length) {
-                const h = parseInt(part.slice(pos, pos + 2));
-                const m = parseInt(part.slice(pos + 2, pos + 4));
-                if (h >= 10 && h <= 23 && m >= 0 && m <= 59) {
-                  timeStr = `${part.slice(pos, pos + 2)}:${part.slice(pos + 2, pos + 4)}`;
-                  skipLen = 4;
-                }
-              }
-              if (!timeStr && pos + 3 <= part.length) {
-                const h = parseInt(part[pos]);
-                const m = parseInt(part.slice(pos + 1, pos + 3));
-                if (h >= 1 && h <= 9 && m >= 0 && m <= 59) {
-                  timeStr = `0${part[pos]}:${part.slice(pos + 1, pos + 3)}`;
-                  skipLen = 3;
-                }
-              }
-              if (!timeStr) { pos++; continue; }
-              pos += skipLen;
-              let pushed = false;
-              for (const hlen of [3, 2]) {
-                if (pos + hlen <= part.length) {
-                  const h = parseInt(part.slice(pos, pos + hlen));
-                  if (h >= 0 && h <= 350) {
-                    allTides.push({ time: timeStr, height: h });
-                    pos += hlen; pushed = true; break;
-                  }
-                }
-              }
-              if (!pushed) pos++;
-            }
-          }
-          i++;
-        }
-      }
+    const allHigh = [
+      ...today.high,
+      ...nextDay.high.map(t => ({ ...t, time: t.time + "+1d" })),
+    ];
+    const allLow = [
+      ...today.low,
+      ...nextDay.low.map(t => ({ ...t, time: t.time + "+1d" })),
+    ];
 
-      if (allTides.length < 2) break;
-      console.log(`  潮汐データ: ${JSON.stringify(allTides)}`);
-      const kocho = findNearest(allTides, currentMinutes, "low");
-      const mancho = findNearest(allTides, currentMinutes, "high");
-      return { kocho, mancho };
-    }
+    const getMin = (t: string) => {
+      const base = t.replace("+1d", "");
+      const m = toMin(base);
+      return t.endsWith("+1d") ? m + 1440 : m;
+    };
+
+    const nextTide = (tides: typeof allHigh) => {
+      const future = tides.filter(t => getMin(t.time) >= currentMinutes);
+      const pick = future.length > 0
+        ? future.sort((a, b) => getMin(a.time) - getMin(b.time))[0]
+        : tides.sort((a, b) => getMin(a.time) - getMin(b.time)).slice(-1)[0];
+      return { time: pick.time.replace("+1d", ""), min: getMin(pick.time) };
+    };
+
+    const nextHigh = nextTide(allHigh);
+    const nextLow  = nextTide(allLow);
+
+    console.log(`  次の満潮: ${nextHigh.time} (${nextHigh.min}分)`);
+    console.log(`  次の干潮: ${nextLow.time} (${nextLow.min}分)`);
+
+    return {
+      mancho: nextHigh.time,
+      kocho:  nextLow.time,
+      kochoFirst: nextLow.min <= nextHigh.min,
+    };
   } catch (e) {
     console.error("潮汐データ取得エラー:", e);
   }
-  return { kocho: "--:--", mancho: "--:--" };
+  return { kocho: "--:--", mancho: "--:--", kochoFirst: true };
 }
 
 export type SurfData = {
@@ -225,6 +185,7 @@ export type SurfData = {
   tideType: string;
   kocho: string;
   mancho: string;
+  kochoFirst: boolean;
 };
 
 export async function getSurfData(): Promise<SurfData> {
@@ -273,5 +234,6 @@ export async function getSurfData(): Promise<SurfData> {
     tideType: getTideType(now),
     kocho: tideData.kocho,
     mancho: tideData.mancho,
+    kochoFirst: tideData.kochoFirst,
   };
 }
