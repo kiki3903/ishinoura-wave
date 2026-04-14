@@ -1,4 +1,5 @@
 import { getSurfData } from "./getSurfData.ts";
+import { postToInstagram } from "./instagram.js";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -11,8 +12,6 @@ const STATE_FILE = path.join(ROOT, "wave-state.json");
 fs.mkdirSync(TMP, { recursive: true });
 
 const GOOGLE_TTS_API_KEY     = process.env.GOOGLE_TTS_API_KEY ?? "";
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN ?? "";
-const INSTAGRAM_ACCOUNT_ID   = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? "";
 const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishinoura-wave";
 const VIDEOS_RELEASE_TAG     = "videos";
 const DAILY_RELEASE_TAG      = "daily";
@@ -77,7 +76,6 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
-// 前回の波高を読み込む
 let lastWaveHeight = null;
 if (fs.existsSync(STATE_FILE)) {
   const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
@@ -105,7 +103,7 @@ const waveLabel = getWaveLabel(currentHeight);
 
 const line1 = `${data.dateText}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
-const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)`;
+const line3 = `波は${waveLabel}(${currentHeight.toFixed(2)}m)`;
 const line4 = `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}`;
 const line4Escaped = line4.replace(/:/g, "\\:");
 
@@ -125,7 +123,7 @@ fs.writeFileSync(voicePath, wav);
 
 const fontPath = execSync("fc-match -f '%{file}' 'Noto Sans CJK JP:style=Bold'").toString().trim();
 const lineHeight = 38;
-const baseY = 660;
+const baseY = 720;
 const ffmpegCmd = [
   "ffmpeg -y",
   `-i "${inputVideo}"`,
@@ -152,12 +150,11 @@ const publicVideoUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/downloa
 const resolvedRes = await fetch(publicVideoUrl, { method: 'HEAD', redirect: 'follow' });
 const directVideoUrl = resolvedRes.url;
 
-const { postToInstagram } = await import("./daily-post.js");
 const caption =
   `${data.dateText}の磯ノ浦\n` +
   `${data.weather} ${data.windDirection}の風\n` +
-  `波は${waveLabel}(${currentHeight.toFixed(2)}m)${data.tideType}\n` +
-  `干潮${data.kocho} 満潮${data.mancho}\n` +
+  `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
+  `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
