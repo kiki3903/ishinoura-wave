@@ -154,7 +154,7 @@ const caption =
   `${data.dateTextDetail}の磯ノ浦\n` +
   `${data.weather} ${data.windDirection}の風\n` +
   `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
-  `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}\n` +
+  `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
