@@ -16,6 +16,7 @@ const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishino
 const VIDEOS_RELEASE_TAG     = "videos";
 const DAILY_RELEASE_TAG      = "daily";
 const THRESHOLD              = 0.20;
+const SURF_MIN               = 0.40;
 
 function getVideoFile(h) {
   if (h < 0.4) return "grandpa_sune.mp4";
@@ -76,10 +77,15 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
+// 前回の波高を読み込む
 let lastWaveHeight = null;
 if (fs.existsSync(STATE_FILE)) {
-  const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-  lastWaveHeight = state.waveHeight ?? null;
+  try {
+    const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+    lastWaveHeight = state.waveHeight ?? null;
+  } catch {
+    lastWaveHeight = null;
+  }
 }
 
 const data = await getSurfData();
@@ -88,23 +94,55 @@ const currentHeight = data.waveHeight;
 console.log(`前回波高: ${lastWaveHeight ?? "なし"}`);
 console.log(`現在波高: ${currentHeight}`);
 
+// 条件分岐
 if (lastWaveHeight !== null) {
   const diff = Math.abs(currentHeight - lastWaveHeight);
   console.log(`変化量: ${diff.toFixed(2)}m`);
-  if (diff < THRESHOLD) {
-    console.log("変化なし。投稿スキップ。");
+
+  const currentAbove = currentHeight > SURF_MIN;
+  const lastAbove = lastWaveHeight > SURF_MIN;
+
+  if (!currentAbove && !lastAbove) {
+    console.log("両方スネ圏内（40cm以下）。投稿スキップ。");
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      waveHeight: currentHeight,
+      postedAt: new Date().toISOString()
+    }), "utf8");
     process.exit(0);
   }
+
+  if (diff < THRESHOLD) {
+    console.log("変化量20cm未満。投稿スキップ。");
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      waveHeight: currentHeight,
+      postedAt: new Date().toISOString()
+    }), "utf8");
+    process.exit(0);
+  }
+
   console.log(`変化あり（${diff.toFixed(2)}m）→ 再投稿します！`);
+} else {
+  // 初回
+  if (currentHeight <= SURF_MIN) {
+    console.log("初回かつスネ圏内（40cm以下）。投稿スキップ。");
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      waveHeight: currentHeight,
+      postedAt: new Date().toISOString()
+    }), "utf8");
+    process.exit(0);
+  }
+  console.log("初回かつ40cm超。投稿します！");
 }
 
 const videoFile = getVideoFile(currentHeight);
 const waveLabel = getWaveLabel(currentHeight);
 
-const line1 = `${data.dateTextDetail}の磯ノ浦は`
+const line1 = `${data.dateTextDetail}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
-const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)`;
-const line4 = data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}` : `満潮${data.mancho} 干潮${data.kocho} ${data.tideType}`;
+const line3 = `波は${waveLabel}(${currentHeight.toFixed(2)}m)`;
+const line4 = data.kochoFirst
+  ? `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}`
+  : `満潮${data.mancho} 干潮${data.kocho} ${data.tideType}`;
 const line4Escaped = line4.replace(/:/g, "\\:");
 
 const inputVideo = path.join(TMP, "input.mp4");
@@ -159,7 +197,9 @@ const caption =
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
 
+// 波高を保存
 fs.writeFileSync(STATE_FILE, JSON.stringify({
   waveHeight: currentHeight,
   postedAt: new Date().toISOString()
 }), "utf8");
+console.log(`  波高保存: ${currentHeight}m`);
