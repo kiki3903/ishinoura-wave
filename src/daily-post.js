@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { getSurfData } from "./getSurfData.ts";
+import { postToInstagram } from "./instagram.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -14,8 +15,6 @@ const TMP = "/tmp/wave-post";
 fs.mkdirSync(TMP, { recursive: true });
 
 const GOOGLE_TTS_API_KEY     = process.env.GOOGLE_TTS_API_KEY ?? "";
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN ?? "";
-const INSTAGRAM_ACCOUNT_ID   = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? "";
 const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishinoura-wave";
 const VIDEOS_RELEASE_TAG     = "videos";
 const DAILY_RELEASE_TAG      = "daily";
@@ -80,58 +79,6 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
-export async function postToInstagram(videoUrl, caption) {
-  console.log("  Instagram: メディアコンテナ作成中...");
-  const containerRes = await fetch(
-    `https://graph.facebook.com/v20.0/${INSTAGRAM_ACCOUNT_ID}/media`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: "REELS",
-        video_url: videoUrl,
-        caption,
-        share_to_feed: true,
-        access_token: INSTAGRAM_ACCESS_TOKEN,
-      }),
-    }
-  );
-  const container = await containerRes.json();
-  if (!container.id) throw new Error(`コンテナ作成失敗: ${JSON.stringify(container)}`);
-  console.log(`  Container ID: ${container.id}`);
-
-  console.log("  動画処理中...");
-  let status = "IN_PROGRESS";
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 10000));
-    const statusRes = await fetch(
-      `https://graph.facebook.com/v20.0/${container.id}?fields=status_code&access_token=${INSTAGRAM_ACCESS_TOKEN}`
-    );
-    const s = await statusRes.json();
-    status = s.status_code;
-    console.log(`  Status: ${status} (${i + 1}/30)`);
-    if (status === "FINISHED") break;
-    if (status === "ERROR") throw new Error(`動画処理エラー: ${JSON.stringify(s)}`);
-  }
-  if (status !== "FINISHED") throw new Error("タイムアウト: 動画処理が完了しませんでした");
-
-  console.log("  投稿中...");
-  const publishRes = await fetch(
-    `https://graph.facebook.com/v20.0/${INSTAGRAM_ACCOUNT_ID}/media_publish`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        creation_id: container.id,
-        access_token: INSTAGRAM_ACCESS_TOKEN,
-      }),
-    }
-  );
-  const published = await publishRes.json();
-  if (!published.id) throw new Error(`投稿失敗: ${JSON.stringify(published)}`);
-  return published.id;
-}
-
 console.log("=".repeat(56));
 console.log(" 磯ノ浦 Daily Wave Post");
 console.log("=".repeat(56));
@@ -172,7 +119,7 @@ console.log(`  フォント: ${fontPath}`);
 
 const outputVideo = path.join(TMP, "output.mp4");
 const lineHeight = 38;
-const baseY = 660;
+const baseY = 720;
 const ffmpegCmd = [
   "ffmpeg -y",
   `-i "${inputVideo}"`,
