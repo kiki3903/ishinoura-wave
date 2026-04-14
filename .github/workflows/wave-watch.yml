@@ -1,7 +1,7 @@
 name: Wave Watch
 on:
   schedule:
-    - cron: '0 * * * *'  # 毎時チェック
+    - cron: '0 * * * *'
   workflow_dispatch:
 jobs:
   watch:
@@ -9,13 +9,31 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
-      - run: node --experimental-strip-types src/wave-watch.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Install ffmpeg and Japanese font
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+      - name: Ensure "daily" release exists
+        run: |
+          gh release view daily --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+            || gh release create daily \
+                --prerelease \
+                --title "Daily Post (auto-generated)" \
+                --notes "毎日の波情報動画。GitHub Actions により自動更新されます。" \
+                --repo "$GITHUB_REPOSITORY"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run wave watch
+        run: node --experimental-strip-types src/wave-watch.js
         env:
           GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
