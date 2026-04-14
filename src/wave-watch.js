@@ -101,7 +101,7 @@ if (lastWaveHeight !== null) {
 const videoFile = getVideoFile(currentHeight);
 const waveLabel = getWaveLabel(currentHeight);
 
-const line1 = `${data.dateText}の磯ノ浦は`;
+const line1 = `${data.dateTextDetail}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
 const line3 = `波は${waveLabel}(${currentHeight.toFixed(2)}m)`;
 const line4 = `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}`;
@@ -115,7 +115,7 @@ const videoUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/download/${VI
 execSync(`curl -fL -o "${inputVideo}" "${videoUrl}"`, { stdio: "inherit" });
 
 const voiceText =
-  `${data.dateText}の磯ノ浦は${data.weather}！` +
+  `${data.dateTextDetail}の磯ノ浦は${data.weather}！` +
   `${data.windDirection}の風！` +
   `波は${waveLabel}！皆さんご安全に！`;
 const wav = await generateVoice(voiceText);
@@ -151,7 +151,7 @@ const resolvedRes = await fetch(publicVideoUrl, { method: 'HEAD', redirect: 'fol
 const directVideoUrl = resolvedRes.url;
 
 const caption =
-  `${data.dateText}の磯ノ浦\n` +
+  `${data.dateTextDetail}の磯ノ浦\n` +
   `${data.weather} ${data.windDirection}の風\n` +
   `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
   `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}\n` +
