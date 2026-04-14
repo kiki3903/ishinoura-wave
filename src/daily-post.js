@@ -91,7 +91,7 @@ const waveLabel = getWaveLabel(data.waveHeight);
 const line1 = `${data.dateText}の磯ノ浦は`;
 const line2 = `${data.weather} ${data.windDirection}の風`;
 const line3 = `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)`;
-const line4 = `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}`;
+const line4 = data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}` : `満潮${data.mancho} 干潮${data.kocho} ${data.tideType}`;
 const line4Escaped = line4.replace(/:/g, "\\:");
 
 console.log(`  波高: ${data.waveHeight}m (${waveLabel}) → ${videoFile}`);
@@ -153,7 +153,7 @@ const caption =
   `${data.dateText}の磯ノ浦\n` +
   `${data.weather} ${data.windDirection}の風\n` +
   `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
-  `干潮${data.kocho} 満潮${data.mancho} ${data.tideType}\n` +
+  `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
   `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
