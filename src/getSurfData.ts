@@ -54,16 +54,16 @@ function getTideType(date: Date): string {
   const age = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
   if (age <= 2) return "大潮";
   if (age <= 4) return "中潮";
-  if (age <= 6) return "小潮";
-  if (age <= 7) return "長潮";
+  if (age <= 5.5) return "小潮";
+  if (age <= 6.5) return "長潮";
   if (age <= 8) return "若潮";
   if (age <= 11) return "中潮";
-  if (age <= 15) return "大潮";
-  if (age <= 17) return "中潮";
-  if (age <= 19) return "小潮";
-  if (age <= 20) return "長潮";
-  if (age <= 21) return "若潮";
-  if (age <= 25) return "中潮";
+  if (age <= 16) return "大潮";
+  if (age <= 18) return "中潮";
+  if (age <= 19.5) return "小潮";
+  if (age <= 20.5) return "長潮";
+  if (age <= 22) return "若潮";
+  if (age <= 27) return "中潮";
   if (age <= 29.5) return "大潮";
   return "大潮";
 }
