@@ -1,5 +1,5 @@
 import { getSurfData } from "./getSurfData.ts";
-import { postToInstagram } from "./instagram.js";
+import { postToInstagram, postToStories } from "./instagram.js";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -77,7 +77,6 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
-// 前回の波高を読み込む
 let lastWaveHeight = null;
 if (fs.existsSync(STATE_FILE)) {
   try {
@@ -94,7 +93,6 @@ const currentHeight = data.waveHeight;
 console.log(`前回波高: ${lastWaveHeight ?? "なし"}`);
 console.log(`現在波高: ${currentHeight}`);
 
-// 条件分岐
 if (lastWaveHeight !== null) {
   const diff = Math.abs(currentHeight - lastWaveHeight);
   console.log(`変化量: ${diff.toFixed(2)}m`);
@@ -122,7 +120,6 @@ if (lastWaveHeight !== null) {
 
   console.log(`変化あり（${diff.toFixed(2)}m）→ 再投稿します！`);
 } else {
-  // 初回
   if (currentHeight <= SURF_MIN) {
     console.log("初回かつスネ圏内（40cm以下）。投稿スキップ。");
     fs.writeFileSync(STATE_FILE, JSON.stringify({
@@ -202,10 +199,14 @@ const caption = isAtama
     `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
     `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
     `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`;
+
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
 
-// 波高を保存
+console.log("\nStories投稿中...");
+const storiesId = await postToStories(directVideoUrl);
+console.log(`✅ Stories投稿完了！ Post ID: ${storiesId}`);
+
 fs.writeFileSync(STATE_FILE, JSON.stringify({
   waveHeight: currentHeight,
   postedAt: new Date().toISOString()
