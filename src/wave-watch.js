@@ -8,15 +8,12 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const TMP = "/tmp/wave-post";
-const STATE_FILE = path.join(ROOT, "wave-state.json");
 fs.mkdirSync(TMP, { recursive: true });
 
 const GOOGLE_TTS_API_KEY     = process.env.GOOGLE_TTS_API_KEY ?? "";
 const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishinoura-wave";
 const VIDEOS_RELEASE_TAG     = "videos";
 const DAILY_RELEASE_TAG      = "daily";
-const THRESHOLD              = 0.20;
-const SURF_MIN               = 0.40;
 
 function getVideoFile(h) {
   if (h < 0.4) return "grandpa_sune.mp4";
@@ -77,59 +74,11 @@ async function generateVoice(text) {
   return pcmToWav(pcm, 24000);
 }
 
-let lastWaveHeight = null;
-if (fs.existsSync(STATE_FILE)) {
-  try {
-    const state = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
-    lastWaveHeight = state.waveHeight ?? null;
-  } catch {
-    lastWaveHeight = null;
-  }
-}
-
 const data = await getSurfData();
 const currentHeight = data.waveHeight;
 
-console.log(`前回波高: ${lastWaveHeight ?? "なし"}`);
-console.log(`現在波高: ${currentHeight}`);
-
-if (lastWaveHeight !== null) {
-  const diff = Math.abs(currentHeight - lastWaveHeight);
-  console.log(`変化量: ${diff.toFixed(2)}m`);
-
-  const currentAbove = currentHeight > SURF_MIN;
-  const lastAbove = lastWaveHeight > SURF_MIN;
-
-  if (!currentAbove && !lastAbove) {
-    console.log("両方スネ圏内（40cm以下）。投稿スキップ。");
-    fs.writeFileSync(STATE_FILE, JSON.stringify({
-      waveHeight: currentHeight,
-      postedAt: new Date().toISOString()
-    }), "utf8");
-    process.exit(0);
-  }
-
-  if (diff < THRESHOLD) {
-    console.log("変化量20cm未満。投稿スキップ。");
-    fs.writeFileSync(STATE_FILE, JSON.stringify({
-      waveHeight: currentHeight,
-      postedAt: new Date().toISOString()
-    }), "utf8");
-    process.exit(0);
-  }
-
-  console.log(`変化あり（${diff.toFixed(2)}m）→ 再投稿します！`);
-} else {
-  if (currentHeight <= SURF_MIN) {
-    console.log("初回かつスネ圏内（40cm以下）。投稿スキップ。");
-    fs.writeFileSync(STATE_FILE, JSON.stringify({
-      waveHeight: currentHeight,
-      postedAt: new Date().toISOString()
-    }), "utf8");
-    process.exit(0);
-  }
-  console.log("初回かつ40cm超。投稿します！");
-}
+console.log(`現在波高: ${currentHeight}m`);
+console.log("Cloudflareで条件チェック済み。投稿します！");
 
 const videoFile = getVideoFile(currentHeight);
 const waveLabel = getWaveLabel(currentHeight);
@@ -206,9 +155,3 @@ console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
 console.log("\nStories投稿中...");
 const storiesId = await postToStories(directVideoUrl);
 console.log(`✅ Stories投稿完了！ Post ID: ${storiesId}`);
-
-fs.writeFileSync(STATE_FILE, JSON.stringify({
-  waveHeight: currentHeight,
-  postedAt: new Date().toISOString()
-}), "utf8");
-console.log(`  波高保存: ${currentHeight}m`);
