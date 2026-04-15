@@ -149,11 +149,20 @@ const directVideoUrl = resolvedRes.url;
 console.log(`  直接URL: ${directVideoUrl}`);
 
 console.log("\n[6/6] Instagram に投稿中...");
-const caption =
-  `${data.dateText}の磯ノ浦\n` +
-  `${data.weather} ${data.windDirection}の風\n` +
-  `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
-  `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
-  `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
+
+const isAtama = data.waveHeight >= 1.6;
+
+const caption = isAtama
+  ? `🚨🏄 波浪注意報\n` +
+    `${data.dateText}の磯ノ浦\n` +
+    `${data.weather} ${data.windDirection}の風\n` +
+    `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
+    `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
+    `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`
+  : `${data.dateText}の磯ノ浦\n` +
+    `${data.weather} ${data.windDirection}の風\n` +
+    `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
+    `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
+    `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
