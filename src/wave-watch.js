@@ -188,12 +188,20 @@ const publicVideoUrl = `https://github.com/${GITHUB_REPOSITORY}/releases/downloa
 const resolvedRes = await fetch(publicVideoUrl, { method: 'HEAD', redirect: 'follow' });
 const directVideoUrl = resolvedRes.url;
 
-const caption =
-  `${data.dateTextDetail}の磯ノ浦\n` +
-  `${data.weather} ${data.windDirection}の風\n` +
-  `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
-  `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
-  `#磯ノ浦 #サーフィン #波情報 #和歌山 #ishinoura`;
+const isAtama = currentHeight >= 1.6;
+
+const caption = isAtama
+  ? `🚨🏄 波浪注意報\n` +
+    `${data.dateTextDetail}の磯ノ浦\n` +
+    `${data.weather} ${data.windDirection}の風\n` +
+    `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
+    `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
+    `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`
+  : `${data.dateTextDetail}の磯ノ浦\n` +
+    `${data.weather} ${data.windDirection}の風\n` +
+    `波は${waveLabel}(${currentHeight.toFixed(2)}m)\n` +
+    `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
+    `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`;
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 再投稿完了！ Post ID: ${postId}`);
 
