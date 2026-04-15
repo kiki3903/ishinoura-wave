@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { getSurfData } from "./getSurfData.ts";
-import { postToInstagram } from "./instagram.js";
+import { postToInstagram, postToStories } from "./instagram.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -164,5 +164,10 @@ const caption = isAtama
     `波は${waveLabel}(${data.waveHeight.toFixed(2)}m)\n` +
     `${data.kochoFirst ? `干潮${data.kocho} 満潮${data.mancho}` : `満潮${data.mancho} 干潮${data.kocho}`} ${data.tideType}\n` +
     `#磯ノ浦 #サーフィン #波情報 #和歌山 #isonoura`;
+
 const postId = await postToInstagram(directVideoUrl, caption);
 console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
+
+console.log("\nStories投稿中...");
+const storiesId = await postToStories(directVideoUrl);
+console.log(`✅ Stories投稿完了！ Post ID: ${storiesId}`);
