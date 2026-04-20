@@ -19,6 +19,10 @@ const GITHUB_REPOSITORY      = process.env.GITHUB_REPOSITORY ?? "kiki3903/ishino
 const VIDEOS_RELEASE_TAG     = "videos";
 const DAILY_RELEASE_TAG      = "daily";
 
+const CLOUDFLARE_API_TOKEN        = process.env.CLOUDFLARE_API_TOKEN ?? "";
+const CLOUDFLARE_ACCOUNT_ID       = process.env.CLOUDFLARE_ACCOUNT_ID ?? "";
+const CLOUDFLARE_KV_NAMESPACE_ID  = process.env.CLOUDFLARE_KV_NAMESPACE_ID ?? "";
+
 function getVideoFile(h) {
   if (h < 0.4) return "grandpa_sune.mp4";
   if (h < 0.6) return "grandpa_hiza.mp4";
@@ -77,6 +81,28 @@ async function generateVoice(text) {
   if (!json.audioContent) throw new Error("Cloud TTS: 音声データなし");
   const pcm = Buffer.from(json.audioContent, "base64");
   return pcmToWav(pcm, 24000);
+}
+
+async function updateCloudflareKV(key, value) {
+  if (!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_KV_NAMESPACE_ID) {
+    console.log("  Cloudflare KV認証情報がないためスキップ");
+    return;
+  }
+  const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces/${CLOUDFLARE_KV_NAMESPACE_ID}/values/${key}`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${CLOUDFLARE_API_TOKEN}`,
+      "Content-Type": "text/plain"
+    },
+    body: String(value)
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`  Cloudflare KV更新失敗: ${res.status} - ${text}`);
+    return;
+  }
+  console.log(`  Cloudflare KV更新成功: ${key} = ${value}`);
 }
 
 console.log("=".repeat(56));
@@ -171,3 +197,6 @@ console.log(`\n✅ 投稿完了！ Post ID: ${postId}`);
 console.log("\nStories投稿中...");
 const storiesId = await postToStories(directVideoUrl);
 console.log(`✅ Stories投稿完了！ Post ID: ${storiesId}`);
+
+console.log("\nCloudflare KV更新中...");
+await updateCloudflareKV("last_posted_height", data.waveHeight);
