@@ -52,18 +52,18 @@ function getTideType(date: Date): string {
   const lunarCycle = 29.530588853;
   const diffDays = (date.getTime() - known.getTime()) / 86400000;
   const age = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
-  if (age <= 1) return "大潮";
-  if (age <= 3) return "中潮";
-  if (age <= 6) return "小潮";
-  if (age <= 7) return "長潮";
-  if (age <= 8) return "若潮";
-  if (age <= 13) return "中潮";
-  if (age <= 15) return "大潮";
-  if (age <= 17) return "中潮";
-  if (age <= 20) return "小潮";
-  if (age <= 21) return "長潮";
-  if (age <= 22) return "若潮";
-  if (age <= 28) return "中潮";
+  if (age < 1) return "大潮";
+  if (age < 5) return "中潮";
+  if (age < 8) return "小潮";
+  if (age < 9) return "長潮";
+  if (age < 10) return "若潮";
+  if (age < 13) return "中潮";
+  if (age < 18) return "大潮";
+  if (age < 22) return "中潮";
+  if (age < 25) return "小潮";
+  if (age < 26) return "長潮";
+  if (age < 27) return "若潮";
+  if (age < 30) return "中潮";
   return "大潮";
 }
 
@@ -73,7 +73,7 @@ function parseTideSection(s: string): { time: string; height: number }[] {
   while (i < s.length) {
     while (i < s.length && s[i] === " ") i++;
     if (i >= s.length) break;
-    if (!/\d/.test(s[i])) { i++; continue; }
+    if (!/\d/.test(s[i]) && s[i] !== "-") { i++; continue; }
     const twoDigit = parseInt(s.slice(i, i + 2));
     const timeLen = (twoDigit >= 10 && twoDigit <= 23) ? 4 : 3;
     if (i + timeLen + 3 > s.length) break;
@@ -82,7 +82,7 @@ function parseTideSection(s: string): { time: string; height: number }[] {
     const min = parseInt(timeStr.slice(-2));
     const heightStr = s.slice(i + timeLen, i + timeLen + 3).trim();
     const height = parseInt(heightStr);
-    if (h >= 0 && h <= 23 && min >= 0 && min <= 59 && !isNaN(height) && height > 0 && height <= 350) {
+    if (h >= 0 && h <= 23 && min >= 0 && min <= 59 && !isNaN(height) && height >= -100 && height <= 350) {
       tides.push({
         time: `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`,
         height,
@@ -151,6 +151,9 @@ async function getTideData(date: Date): Promise<{ kocho: string; mancho: string;
     };
 
     const nextTide = (tides: typeof allHigh) => {
+      if (tides.length === 0) {
+        return { time: "--:--", min: 0 };
+      }
       const future = tides.filter(t => getMin(t.time) >= currentMinutes);
       const pick = future.length > 0
         ? future.sort((a, b) => getMin(a.time) - getMin(b.time))[0]
